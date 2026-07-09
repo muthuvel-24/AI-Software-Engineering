@@ -1,0 +1,19 @@
+# ─── Node / Vite ──────────────────────────────────────────────────────────────
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# ─── Environment files (NEVER commit real keys) ───────────────────────────────
+.env
+.env.local
+.env.*.local
+
+# Editor
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

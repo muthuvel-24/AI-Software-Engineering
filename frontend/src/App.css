@@ -1,0 +1,52 @@
+/* Title font class */
+.title-font {
+  font-family: var(--font-title);
+}
+
+/* Light mode overrides */
+.light {
+  --bg-card: rgba(255, 255, 255, 0.75);
+  --border-glass: rgba(0, 0, 0, 0.08);
+}
+
+.light .glass-panel {
+  background: var(--bg-card);
+  border-color: var(--border-glass);
+}
+
+.light select,
+.light input,
+.light textarea {
+  background-color: #f1f5f9 !important;
+  border-color: #e2e8f0 !important;
+  color: #1e293b !important;
+}
+
+.light select option {
+  background-color: #f1f5f9;
+  color: #1e293b;
+}
+
+/* Smooth transitions for all interactive elements */
+* {
+  transition-property: background-color, border-color, color, opacity;
+  transition-duration: 0.15s;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Agent workspace loading animation */
+@keyframes shimmer {
+  0% { background-position: -200px 0; }
+  100% { background-position: calc(200px + 100%) 0; }
+}
+
+.shimmer-loading {
+  animation: shimmer 1.5s infinite;
+  background: linear-gradient(to right, transparent 0%, rgba(168, 85, 247, 0.05) 50%, transparent 100%);
+  background-size: 200px 100%;
+}
+
+/* Mono font class for code sections */
+.font-mono {
+  font-family: var(--font-mono);
+}

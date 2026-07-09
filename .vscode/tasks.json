@@ -1,0 +1,105 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "▶ Start Backend (Spring Boot)",
+      "type": "shell",
+      "command": ".\\mvnw.cmd spring-boot:run",
+      "options": {
+        "cwd": "${workspaceFolder}\\backend"
+      },
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "dedicated",
+        "label": "Backend"
+      },
+      "isBackground": true,
+      "problemMatcher": {
+        "pattern": {
+          "regexp": "^$"
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "Starting AiEngineeringAssistantApplication",
+          "endsPattern": "Tomcat started on port"
+        }
+      }
+    },
+    {
+      "label": "▶ Start Frontend (Vite)",
+      "type": "shell",
+      "command": "npm run dev",
+      "options": {
+        "cwd": "${workspaceFolder}\\frontend"
+      },
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "dedicated",
+        "label": "Frontend"
+      },
+      "isBackground": true,
+      "problemMatcher": {
+        "pattern": {
+          "regexp": "^$"
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "VITE",
+          "endsPattern": "Local:"
+        }
+      }
+    },
+    {
+      "label": "🚀 Start Full Stack (Backend + Frontend)",
+      "dependsOn": [
+        "▶ Start Backend (Spring Boot)",
+        "▶ Start Frontend (Vite)"
+      ],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "dependsOrder": "parallel",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "📦 Install Frontend Dependencies",
+      "type": "shell",
+      "command": "npm install",
+      "options": {
+        "cwd": "${workspaceFolder}\\frontend"
+      },
+      "group": "build",
+      "presentation": {
+        "panel": "dedicated",
+        "label": "npm install"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "🔨 Build Backend (Maven)",
+      "type": "shell",
+      "command": ".\\mvnw.cmd clean package -DskipTests",
+      "options": {
+        "cwd": "${workspaceFolder}\\backend"
+      },
+      "group": "build",
+      "presentation": {
+        "panel": "dedicated",
+        "label": "Maven Build"
+      },
+      "problemMatcher": "$msCompile"
+    }
+  ]
+}

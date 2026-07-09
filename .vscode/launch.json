@@ -1,0 +1,40 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "java",
+      "name": "🔵 Debug Backend (Spring Boot)",
+      "request": "launch",
+      "mainClass": "com.assistant.ai.AiEngineeringAssistantApplication",
+      "projectName": "ai-engineering-assistant",
+      "cwd": "${workspaceFolder}/backend",
+      "vmArgs": "-Dspring.profiles.active=default",
+      "env": {
+        "DB_URL": "jdbc:postgresql://localhost:5432/ai_assistant",
+        "DB_USERNAME": "postgres",
+        "DB_PASSWORD": "${env:DB_PASSWORD}",
+        "OPENROUTER_API_KEY": "${env:OPENROUTER_API_KEY}"
+      }
+    },
+    {
+      "type": "chrome",
+      "name": "🟢 Debug Frontend (Chrome)",
+      "request": "launch",
+      "url": "http://localhost:5173",
+      "webRoot": "${workspaceFolder}/frontend/src",
+      "sourceMapPathOverrides": {
+        "webpack:///src/*": "${webRoot}/*"
+      }
+    }
+  ],
+  "compounds": [
+    {
+      "name": "🚀 Full Stack Debug",
+      "configurations": [
+        "🔵 Debug Backend (Spring Boot)",
+        "🟢 Debug Frontend (Chrome)"
+      ],
+      "stopAll": true
+    }
+  ]
+}

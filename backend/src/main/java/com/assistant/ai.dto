@@ -1,0 +1,24 @@
+package com.assistant.ai.dto;
+
+/**
+ * DTO for code review request.
+ * Used to send source code or repository information to the Code Review Agent.
+ */
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+public class CodeReviewRequest {
+    
+    /** Unique identifier for the code review request */
+    private String requestId;
+    
+    /** Path or URL to the source code to be reviewed */
+    private String codePath;
+    
+    /** Optional context or description for the review */
+    private String context;
+    
+    /** Specific areas of focus for the review */
+    private List<String> focusAreas;
+}

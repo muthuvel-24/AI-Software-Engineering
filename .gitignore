@@ -1,0 +1,36 @@
+# ─── Environment / Secrets (NEVER commit) ─────────────────────────────────────
+.env
+.env.local
+.env.*.local
+*.local.properties
+application-local.properties
+application-secrets.properties
+
+# ─── Node.js / Frontend ────────────────────────────────────────────────────────
+node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/dist-ssr/
+frontend/.vite/
+
+# ─── Java / Maven Build Output ─────────────────────────────────────────────────
+backend/target/
+*.class
+*.jar
+*.war
+
+# ─── IDE / Editor ──────────────────────────────────────────────────────────────
+.idea/
+*.iml
+.vscode/settings.json
+*.suo
+*.ntvs*
+
+# ─── OS Files ──────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ─── Logs ──────────────────────────────────────────────────────────────────────
+*.log
+logs/

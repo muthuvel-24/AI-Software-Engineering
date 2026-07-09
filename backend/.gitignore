@@ -1,0 +1,19 @@
+# ─── Maven build output ────────────────────────────────────────────────────────
+target/
+*.class
+
+# ─── Environment / secrets (NEVER commit real values) ─────────────────────────
+.env
+.env.local
+application-local.properties
+application-secrets.properties
+
+# ─── IDE files ─────────────────────────────────────────────────────────────────
+.idea/
+*.iml
+.vscode/
+*.suo
+
+# ─── OS files ──────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
