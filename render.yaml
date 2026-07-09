@@ -1,0 +1,33 @@
+services:
+  # Spring Boot Backend Web Service
+  - type: web
+    name: ai-engineering-backend
+    runtime: java
+    plan: free
+    buildCommand: cd backend && ./mvnw clean package -DskipTests
+    startCommand: java -jar backend/target/ai-engineering-assistant-0.0.1-SNAPSHOT.jar
+    envVars:
+      - key: DB_URL
+        fromDatabase:
+          name: ai-assistant-db
+          property: connectionString
+      - key: DB_USERNAME
+        fromDatabase:
+          name: ai-assistant-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: ai-assistant-db
+          property: password
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: SPRING_PROFILES_ACTIVE
+        value: prod
+
+databases:
+  # PostgreSQL Database
+  - name: ai-assistant-db
+    plan: free
+    databaseName: ai_assistant

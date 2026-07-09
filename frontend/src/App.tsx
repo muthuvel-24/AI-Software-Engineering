@@ -8,7 +8,8 @@ import AuthPage from './pages/AuthPage';
 import { Sun, Moon, Key, ShieldCheck } from 'lucide-react';
 
 export default function App() {
-  const apiBaseUrl = '';
+  // In production: set VITE_API_BASE_URL to your Render backend URL
+  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '';
 
   // Session & Identity
   const [token, setToken] = useState<string | null>(localStorage.getItem('token'));
