@@ -10,14 +10,17 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 
 import javax.sql.DataSource;
+import java.net.URI;
+import java.net.URISyntaxException;
 
 /**
  * Custom DataSource configuration that handles Render's PostgreSQL URL format.
  *
  * Render provides database URLs in the format: postgresql://user:pass@host/db
- * But JDBC requires:                            jdbc:postgresql://user:pass@host/db
+ * But JDBC requires:                            jdbc:postgresql://host:port/db
+ * And username/password must be configured separately.
  *
- * This class automatically converts either format to a valid JDBC URL.
+ * This class automatically parses any database URL format and configures Hikari.
  */
 @Configuration
 public class DataSourceConfig {
@@ -52,22 +55,17 @@ public class DataSourceConfig {
     @Primary
     public DataSource dataSource() {
         HikariConfig config = new HikariConfig();
-
-        String jdbcUrl = resolveJdbcUrl();
-        log.info("Connecting to database: {}", jdbcUrl.replaceAll(":[^:@]+@", ":***@")); // mask password in logs
-
-        config.setJdbcUrl(jdbcUrl);
-
-        // If URL contains credentials, don't set them separately
-        if (!jdbcUrl.contains("@")) {
-            config.setUsername(dbUsername);
-            config.setPassword(dbPassword);
-        } else {
-            // Render's connectionString contains user:pass in the URL itself
-            // Extract username and password from URL or leave for JDBC driver
-        }
-
         config.setDriverClassName("org.postgresql.Driver");
+
+        // Parse any provided database URL
+        DbSettings settings = resolveDbSettings();
+
+        log.info("Connecting to database host: {}:{} (DB: {})", settings.host, settings.port, settings.database);
+
+        config.setJdbcUrl(settings.jdbcUrl);
+        config.setUsername(settings.username);
+        config.setPassword(settings.password);
+
         config.setConnectionTimeout(20000);
         config.setMaximumPoolSize(5);
         config.setMinimumIdle(1);
@@ -76,43 +74,87 @@ public class DataSourceConfig {
         return new HikariDataSource(config);
     }
 
-    private String resolveJdbcUrl() {
-        // Priority 1: DATABASE_URL (Render auto-injects this)
+    private DbSettings resolveDbSettings() {
+        // Try DATABASE_URL (Render auto-injected)
         if (!databaseUrl.isEmpty()) {
             log.info("Using DATABASE_URL environment variable");
-            return toJdbcUrl(databaseUrl);
+            DbSettings parsed = parseUrl(databaseUrl);
+            if (parsed != null) return parsed;
         }
 
-        // Priority 2: DB_URL (our custom variable, might be postgresql:// from Render)
+        // Try DB_URL
         if (!dbUrl.isEmpty()) {
             log.info("Using DB_URL environment variable");
-            return toJdbcUrl(dbUrl);
+            DbSettings parsed = parseUrl(dbUrl);
+            if (parsed != null) return parsed;
         }
 
-        // Priority 3: Individual DB_HOST / DB_PORT / DB_NAME components
-        String constructed = "jdbc:postgresql://" + dbHost + ":" + dbPort + "/" + dbName;
-        log.info("Constructing JDBC URL from DB_HOST/DB_PORT/DB_NAME");
-        return constructed;
+        // Fallback: Construct from individual parts
+        log.info("Constructing database configuration from individual parts (DB_HOST, etc.)");
+        DbSettings settings = new DbSettings();
+        settings.host = dbHost;
+        settings.port = dbPort;
+        settings.database = dbName;
+        settings.username = dbUsername;
+        settings.password = dbPassword;
+        settings.jdbcUrl = "jdbc:postgresql://" + dbHost + ":" + dbPort + "/" + dbName;
+        return settings;
     }
 
-    /**
-     * Converts any PostgreSQL URL format to a valid JDBC URL.
-     * Handles:
-     *   postgresql://user:pass@host/db  -> jdbc:postgresql://user:pass@host/db
-     *   postgres://user:pass@host/db    -> jdbc:postgresql://user:pass@host/db
-     *   jdbc:postgresql://...           -> unchanged (already valid)
-     */
-    private String toJdbcUrl(String url) {
-        if (url.startsWith("jdbc:")) {
-            return url; // Already valid JDBC URL
+    private DbSettings parseUrl(String rawUrl) {
+        try {
+            // Clean up scheme for java.net.URI parsing if needed
+            String cleanUrl = rawUrl;
+            if (cleanUrl.startsWith("jdbc:")) {
+                // If it's already jdbc:postgresql://host/db, let's extract the part after jdbc:
+                cleanUrl = cleanUrl.substring("jdbc:".length());
+            }
+
+            // Standardize scheme to postgresql (java.net.URI expects a scheme)
+            if (cleanUrl.startsWith("postgres://")) {
+                cleanUrl = "postgresql://" + cleanUrl.substring("postgres://".length());
+            }
+
+            URI uri = new URI(cleanUrl);
+            DbSettings settings = new DbSettings();
+
+            // Extract host, port, database
+            settings.host = uri.getHost();
+            settings.port = String.valueOf(uri.getPort() == -1 ? 5432 : uri.getPort());
+            
+            String path = uri.getPath();
+            if (path != null && path.startsWith("/")) {
+                settings.database = path.substring(1);
+            } else {
+                settings.database = path;
+            }
+
+            // Extract userInfo (user:password)
+            String userInfo = uri.getUserInfo();
+            if (userInfo != null && userInfo.contains(":")) {
+                String[] parts = userInfo.split(":", 2);
+                settings.username = parts[0];
+                settings.password = parts[1];
+            } else {
+                settings.username = dbUsername;
+                settings.password = dbPassword;
+            }
+
+            // Construct clean JDBC URL WITHOUT credentials embedded (which PostgreSQL JDBC driver rejects)
+            settings.jdbcUrl = "jdbc:postgresql://" + settings.host + ":" + settings.port + "/" + settings.database;
+            return settings;
+        } catch (URISyntaxException e) {
+            log.error("Failed to parse database URL: {}. Falling back to default properties.", rawUrl, e);
+            return null;
         }
-        if (url.startsWith("postgresql://")) {
-            return "jdbc:" + url;
-        }
-        if (url.startsWith("postgres://")) {
-            return "jdbc:postgresql://" + url.substring("postgres://".length());
-        }
-        // Unknown format — return as-is and let JDBC handle it
-        return url;
+    }
+
+    private static class DbSettings {
+        String jdbcUrl;
+        String username;
+        String password;
+        String host;
+        String port;
+        String database;
     }
 }
