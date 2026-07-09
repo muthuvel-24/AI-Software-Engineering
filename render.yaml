@@ -1,11 +1,11 @@
 services:
-  # Spring Boot Backend Web Service
+  # Spring Boot Backend — Docker deployment
   - type: web
     name: ai-engineering-backend
-    runtime: java
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
     plan: free
-    buildCommand: cd backend && ./mvnw clean package -DskipTests
-    startCommand: java -jar backend/target/ai-engineering-assistant-0.0.1-SNAPSHOT.jar
     envVars:
       - key: DB_URL
         fromDatabase:
@@ -23,11 +23,9 @@ services:
         sync: false
       - key: JWT_SECRET
         generateValue: true
-      - key: SPRING_PROFILES_ACTIVE
-        value: prod
 
 databases:
-  # PostgreSQL Database
+  # Free PostgreSQL database
   - name: ai-assistant-db
     plan: free
     databaseName: ai_assistant
