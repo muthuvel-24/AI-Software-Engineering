@@ -1,5 +1,4 @@
 services:
-  # Spring Boot Backend — Docker deployment (context = repo root)
   - type: web
     name: ai-engineering-backend
     runtime: docker
@@ -7,10 +6,19 @@ services:
     dockerContext: .
     plan: free
     envVars:
-      - key: DB_URL
+      # Build JDBC URL from individual DB components (not connectionString)
+      - key: DB_HOST
         fromDatabase:
           name: ai-assistant-db
-          property: connectionString
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: ai-assistant-db
+          property: port
+      - key: DB_NAME
+        fromDatabase:
+          name: ai-assistant-db
+          property: database
       - key: DB_USERNAME
         fromDatabase:
           name: ai-assistant-db
@@ -25,7 +33,6 @@ services:
         generateValue: true
 
 databases:
-  # Free PostgreSQL database
   - name: ai-assistant-db
     plan: free
     databaseName: ai_assistant
