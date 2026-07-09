@@ -1,10 +1,10 @@
 services:
-  # Spring Boot Backend — Docker deployment
+  # Spring Boot Backend — Docker deployment (context = repo root)
   - type: web
     name: ai-engineering-backend
     runtime: docker
     dockerfilePath: ./backend/Dockerfile
-    dockerContext: ./backend
+    dockerContext: .
     plan: free
     envVars:
       - key: DB_URL

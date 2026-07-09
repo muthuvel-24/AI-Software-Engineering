@@ -3,12 +3,16 @@ FROM maven:3.9.6-eclipse-temurin-17 AS builder
 
 WORKDIR /app
 
-# Copy pom.xml first for layer caching
-COPY pom.xml .
+# Copy pom.xml first (from backend/ folder in repo root context)
+COPY backend/pom.xml .
+
+# Download dependencies for caching
 RUN mvn dependency:go-offline -B
 
-# Copy source and build
-COPY src ./src
+# Copy source code
+COPY backend/src ./src
+
+# Build the JAR
 RUN mvn clean package -DskipTests -B
 
 # ─── Stage 2: Run the JAR ──────────────────────────────────────────────────────
