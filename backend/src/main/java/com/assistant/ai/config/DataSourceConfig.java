@@ -69,7 +69,11 @@ public class DataSourceConfig {
         config.setConnectionTimeout(20000);
         config.setMaximumPoolSize(5);
         config.setMinimumIdle(1);
-        config.addDataSourceProperty("sslmode", "require");
+        if (settings.host != null && !settings.host.equalsIgnoreCase("localhost") && !settings.host.equals("127.0.0.1")) {
+            config.addDataSourceProperty("sslmode", "require");
+        } else {
+            config.addDataSourceProperty("sslmode", "prefer");
+        }
 
         return new HikariDataSource(config);
     }

@@ -2,12 +2,19 @@ package com.assistant.ai.service;
 
 import com.assistant.ai.model.*;
 import com.assistant.ai.repository.*;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Service
 public class AgentOrchestrationService {
+
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Autowired
     private LLMService llmService;
@@ -51,12 +58,28 @@ public class AgentOrchestrationService {
         "Use Markdown code blocks to organize.";
 
     private static final String SYSTEM_CODE_REVIEWER = 
-        "You are the 'Code Review & Bug Detection Agent'. Analyze source code, zip projects, or git repositories. " +
-        "Evaluate: Syntax errors, logical errors, security (SQL Injection, XSS, CSRF, auth issues), performance, dead code, bad naming, long methods, high complexity. " +
-        "Provide: 1. Scores (Quality, Maintainability, Readability, Performance, Security, Architecture) from 0 to 100. " +
-        "2. Line-by-line suggestions. 3. Refactored codes. 4. Formatting output as structured markdown. " +
-        "IMPORTANT: You must output a section labeled 'BUGS:' followed by bug details in a structured parser format: " +
-        "[BUG] Title | Severity (HIGH/MEDIUM/LOW) | FilePath | LineNumber | Description | Fix";
+        "You are the 'Code Review & Bug Detection Agent'. Analyze the provided source code for syntax errors, logical defects, security vulnerabilities (SQL Injection, XSS, CSRF, insecure auth, resource leaks), performance bottlenecks, and architectural cohesion.\n" +
+        "Evaluate the code thoroughly. If the code is clean, high quality, and has NO bugs, explicitly state that no bugs were found and give appropriate high scores (90-100).\n" +
+        "IMPORTANT: In addition to your markdown analysis, you MUST include a JSON summary block at the end of your response inside ```json and ``` with this exact structure:\n" +
+        "{\n" +
+        "  \"overallScore\": <0-100>,\n" +
+        "  \"readability\": <0-100>,\n" +
+        "  \"maintainability\": <0-100>,\n" +
+        "  \"security\": <0-100>,\n" +
+        "  \"performance\": <0-100>,\n" +
+        "  \"architecture\": <0-100>,\n" +
+        "  \"bugs\": [\n" +
+        "    {\n" +
+        "      \"title\": \"Short bug title\",\n" +
+        "      \"severity\": \"HIGH|MEDIUM|LOW\",\n" +
+        "      \"filePath\": \"File name or snippet identifier\",\n" +
+        "      \"lineNumber\": <line number integer>,\n" +
+        "      \"description\": \"Detailed explanation of the issue\",\n" +
+        "      \"suggestedFix\": \"Code fix or refactoring advice\"\n" +
+        "    }\n" +
+        "  ]\n" +
+        "}\n" +
+        "If there are NO bugs, set \"bugs\": []. Do NOT invent fake bugs if the code is clean!";
 
     private static final String SYSTEM_SQL_GENERATOR = 
         "You are the 'SQL Generator Agent'. Convert natural language statements into SQL statements. " +
@@ -99,13 +122,63 @@ public class AgentOrchestrationService {
 
         String reviewReport = llmService.generate(provider, model, apiKey, SYSTEM_CODE_REVIEWER, codeContent);
 
-        // Parse metrics or default if mock
-        int score = parseMetric(reviewReport, "Quality", 80);
-        int readability = parseMetric(reviewReport, "Readability", 85);
-        int maintainability = parseMetric(reviewReport, "Maintainability", 82);
-        int security = parseMetric(reviewReport, "Security", 80);
-        int performance = parseMetric(reviewReport, "Performance", 78);
-        int architecture = parseMetric(reviewReport, "Architecture", 80);
+        int score = 88;
+        int readability = 90;
+        int maintainability = 85;
+        int security = 88;
+        int performance = 85;
+        int architecture = 85;
+        boolean jsonParsed = false;
+        List<BugReport> parsedBugs = new ArrayList<>();
+
+        // Try extracting JSON block first
+        String jsonBlock = extractCodeBlock(reviewReport, "json");
+        if (jsonBlock != null && !jsonBlock.isEmpty()) {
+            try {
+                JsonNode root = objectMapper.readTree(jsonBlock);
+                if (root.has("overallScore")) score = root.path("overallScore").asInt(score);
+                if (root.has("readability")) readability = root.path("readability").asInt(readability);
+                if (root.has("maintainability")) maintainability = root.path("maintainability").asInt(maintainability);
+                if (root.has("security")) security = root.path("security").asInt(security);
+                if (root.has("performance")) performance = root.path("performance").asInt(performance);
+                if (root.has("architecture")) architecture = root.path("architecture").asInt(architecture);
+
+                JsonNode bugsNode = root.path("bugs");
+                if (bugsNode.isArray()) {
+                    for (JsonNode b : bugsNode) {
+                        String title = b.path("title").asText("Code Issue");
+                        String severity = b.path("severity").asText("MEDIUM").toUpperCase();
+                        String filePath = b.path("filePath").asText("SourceCode");
+                        int lineNumber = b.path("lineNumber").asInt(1);
+                        String description = b.path("description").asText("");
+                        String suggestedFix = b.path("suggestedFix").asText("Refactor code");
+
+                        parsedBugs.add(BugReport.builder()
+                                .title(title)
+                                .severity(severity)
+                                .filePath(filePath)
+                                .lineNumber(lineNumber)
+                                .description(description)
+                                .suggestedFix(suggestedFix)
+                                .build());
+                    }
+                }
+                jsonParsed = true;
+            } catch (Exception e) {
+                // Fallback to text parsing
+            }
+        }
+
+        if (!jsonParsed) {
+            score = parseMetric(reviewReport, "Quality", 85);
+            readability = parseMetric(reviewReport, "Readability", 85);
+            maintainability = parseMetric(reviewReport, "Maintainability", 85);
+            security = parseMetric(reviewReport, "Security", 85);
+            performance = parseMetric(reviewReport, "Performance", 85);
+            architecture = parseMetric(reviewReport, "Architecture", 85);
+
+            parsedBugs = parseBugsFromText(reviewReport);
+        }
 
         Review review = Review.builder()
                 .project(project)
@@ -120,8 +193,11 @@ public class AgentOrchestrationService {
 
         Review savedReview = reviewRepository.save(review);
 
-        // Extract and save bugs
-        parseAndSaveBugs(savedReview, reviewReport);
+        // Associate and persist the parsed bugs (if code is clean, parsedBugs is empty - no fake bugs saved!)
+        for (BugReport bug : parsedBugs) {
+            bug.setReview(savedReview);
+            bugReportRepository.save(bug);
+        }
 
         return savedReview;
     }
@@ -181,17 +257,13 @@ public class AgentOrchestrationService {
     // --- Helper Parsing Routines ---
 
     private int parseMetric(String text, String metricName, int defaultValue) {
+        if (text == null) return defaultValue;
         try {
-            String lower = text.toLowerCase();
-            int idx = lower.indexOf(metricName.toLowerCase());
-            if (idx != -1) {
-                // Look for numbers following the metric name
-                String sub = text.substring(idx, Math.min(idx + 30, text.length()));
-                String digits = sub.replaceAll("[^0-9]", "");
-                if (!digits.isEmpty()) {
-                    int value = Integer.parseInt(digits.substring(0, Math.min(3, digits.length())));
-                    return Math.max(0, Math.min(100, value));
-                }
+            Pattern pattern = Pattern.compile("(?i)" + Pattern.quote(metricName) + "[^0-9\\n]{0,25}(\\d{1,3})(?:/100|%)?");
+            Matcher matcher = pattern.matcher(text);
+            if (matcher.find()) {
+                int val = Integer.parseInt(matcher.group(1));
+                return Math.max(0, Math.min(100, val));
             }
         } catch (Exception e) {
             // Ignore parse failures
@@ -199,59 +271,36 @@ public class AgentOrchestrationService {
         return defaultValue;
     }
 
-    private void parseAndSaveBugs(Review review, String text) {
-        // Parse BUGS section
-        int idx = text.indexOf("BUGS:");
-        if (idx == -1) {
-            // Create a few mock bugs if parsing fails or not present in simulation
-            bugReportRepository.save(BugReport.builder()
-                    .review(review)
-                    .title("SQL Injection Vulnerability")
-                    .description("String concatenation detected in raw JDBC query. Parameter binding should be used instead.")
-                    .severity("HIGH")
-                    .filePath("UserRepository.java")
-                    .lineNumber(42)
-                    .suggestedFix("query.setParameter(\"username\", input)")
-                    .build());
-            bugReportRepository.save(BugReport.builder()
-                    .review(review)
-                    .title("Resource Leak")
-                    .description("BufferedReader stream is not closed after reading operation.")
-                    .severity("MEDIUM")
-                    .filePath("FileReaderService.java")
-                    .lineNumber(18)
-                    .suggestedFix("Use try-with-resources statement: try (BufferedReader br = ...)")
-                    .build());
-            return;
-        }
+    private List<BugReport> parseBugsFromText(String text) {
+        List<BugReport> list = new ArrayList<>();
+        if (text == null || text.isEmpty()) return list;
 
-        String bugsSection = text.substring(idx);
-        String[] lines = bugsSection.split("\n");
+        String[] lines = text.split("\\r?\\n");
         for (String line : lines) {
             if (line.startsWith("[BUG]")) {
                 try {
                     String clean = line.substring(5).trim();
                     String[] parts = clean.split("\\|");
                     if (parts.length >= 5) {
-                        BugReport bug = BugReport.builder()
-                                .review(review)
+                        list.add(BugReport.builder()
                                 .title(parts[0].trim())
-                                .severity(parts[1].trim())
+                                .severity(parts[1].trim().toUpperCase())
                                 .filePath(parts[2].trim())
                                 .lineNumber(Integer.parseInt(parts[3].trim().replaceAll("[^0-9]", "")))
                                 .description(parts[4].trim())
                                 .suggestedFix(parts.length > 5 ? parts[5].trim() : "Optimize layout structure")
-                                .build();
-                        bugReportRepository.save(bug);
+                                .build());
                     }
                 } catch (Exception e) {
                     // Ignore lines that fail parsing
                 }
             }
         }
+        return list;
     }
 
     private String extractCodeBlock(String text, String lang) {
+        if (text == null) return null;
         String marker = "```" + lang;
         int start = text.indexOf(marker);
         if (start != -1) {
@@ -268,7 +317,7 @@ public class AgentOrchestrationService {
                 return text.substring(start + 3, end).trim();
             }
         }
-        return text;
+        return null;
     }
 
     private String extractClassName(String code) {
